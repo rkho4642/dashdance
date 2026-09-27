@@ -5,12 +5,12 @@ Online, built by statically recompiling the game's PowerPC code to C++ and runni
 runtime with a Metal renderer. Read this file first; it tells you how the tree is laid out, how to
 build, and the rules that are not obvious from the code.
 
-## Fork workflow (rkho4642/dashdance, branch `dashdance2`)
+## Fork workflow (rkoh46/dashdance, branch `dashdance2`)
 
 This checkout is rkoh's playtest fork. They play, things break, and fixes land here one commit at a
 time until they go upstream as one PR. Commits are authored as `rkoh` (git config); never as the Mac login name. This section is fork-only: drop it from the PR.
 
-- Remotes: `fork` is rkho4642/dashdance (push here), `origin` is TheAndersMadsen/dashdance (upstream; never push).
+- Remotes: `fork` is rkoh46/dashdance (push here), `origin` is TheAndersMadsen/dashdance (upstream; never push).
 - Work on `dashdance2` (the fork's default branch; the README's install line fetches it). One fix per commit. Push to `fork` after each fix.
 - `/fix-logs` (`.agents/skills/fix-logs/`) reviews unreviewed session logs and crash reports and fixes what they show.
 - `docs/MAC_FIXES.md` is the issue and fix log. `docs/PR.md` is the running PR description: everything added to the

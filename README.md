@@ -34,7 +34,7 @@ Games &nbsp;·&nbsp; Free &nbsp;·&nbsp; Open source &nbsp;·&nbsp; For Slippi O
 
 ## About this fork
 
-This is [rkho4642's](https://github.com/rkho4642/dashdance) playtest fork of [TheAndersMadsen/dashdance](https://github.com/TheAndersMadsen/dashdance). Everything here is the original Dashdance plus fixes found by playing it on a Mac, kept on the `dashdance2` branch until they go upstream. What is different from the original:
+This is [rkoh46's](https://github.com/rkoh46/dashdance) playtest fork of [TheAndersMadsen/dashdance](https://github.com/TheAndersMadsen/dashdance). Everything here is the original Dashdance plus fixes found by playing it on a Mac, kept on the `dashdance2` branch until they go upstream. What is different from the original:
 
 - **Online games no longer drop 30 seconds after connecting** when the opponent's router remaps their port. An expired connection attempt to the advertised port no longer counts the player as gone.
 - **Characters no longer stay invisible after an app update.** A draw whose shader is still waiting in the boot-time precompile queue compiles it at once instead of waiting up to a minute and a half.
@@ -97,7 +97,7 @@ Every other way to play Melee on a Mac runs a GameCube in software, one instruct
 **Install.** Open Terminal: press ⌘ Space, type *Terminal* and press Return. Paste this line and press Return:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rkho4642/dashdance/dashdance2/install.sh | zsh
+curl -fsSL https://raw.githubusercontent.com/rkoh46/dashdance/dashdance2/install.sh | zsh
 ```
 
 When it asks, drag your Melee disc image into the Terminal window and press Return. Dashdance builds itself on your Mac from your own disc, which takes ten to fifteen minutes the first time. Then it's in your Applications folder, and it opens. To update, paste the same line again.
@@ -144,7 +144,7 @@ Yes. Dashdance uses Slippi's own matchmaking and netcode.
 It installs Apple's developer tools and a few build tools, then builds the app. It doesn't install drivers or change your Mac's security settings.
 
 **Something isn't working.**
-Dashdance is still in alpha. Please [open an issue](https://github.com/rkho4642/dashdance/issues) on this fork and tell us what happened.
+Dashdance is still in alpha. Please [open an issue](https://github.com/rkoh46/dashdance/issues) on this fork and tell us what happened.
 
 ## For developers
 
