@@ -97,7 +97,7 @@ Every other way to play Melee on a Mac runs a GameCube in software, one instruct
 **Install.** Open Terminal: press ⌘ Space, type *Terminal* and press Return. Paste this line and press Return:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/TheAndersMadsen/dashdance/main/install.sh | zsh
+curl -fsSL https://raw.githubusercontent.com/rkho4642/dashdance/dashdance2/install.sh | zsh
 ```
 
 When it asks, drag your Melee disc image into the Terminal window and press Return. Dashdance builds itself on your Mac from your own disc, which takes ten to fifteen minutes the first time. Then it's in your Applications folder, and it opens. To update, paste the same line again.
@@ -108,7 +108,7 @@ When it asks, drag your Melee disc image into the Terminal window and press Retu
 
 | | |
 |---|---|
-| **Developer** | TheAndersMadsen and contributors |
+| **Developer** | rkoh (this fork), on Dashdance by TheAndersMadsen and contributors |
 | **Size** | 73 MB on Mac · 19 MB for iPhone and iPad |
 | **Category** | Games |
 | **Mac** | Apple silicon, macOS 14 or later (Liquid Glass on macOS 26) |
@@ -144,7 +144,7 @@ Yes. Dashdance uses Slippi's own matchmaking and netcode.
 It installs Apple's developer tools and a few build tools, then builds the app. It doesn't install drivers or change your Mac's security settings.
 
 **Something isn't working.**
-Dashdance is still in alpha. Please [open an issue](https://github.com/TheAndersMadsen/dashdance/issues) and tell us what happened.
+Dashdance is still in alpha. Please [open an issue](https://github.com/rkho4642/dashdance/issues) on this fork and tell us what happened.
 
 ## For developers
 
