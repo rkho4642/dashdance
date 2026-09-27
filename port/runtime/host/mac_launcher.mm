@@ -302,6 +302,7 @@ API_AVAILABLE(macos(26.0))
 
 @interface MULauncherWindow : NSObject <NSWindowDelegate, NSTextFieldDelegate>
 @property(nonatomic) host::LauncherSettings* settings;
+@property(nonatomic) NSTask* playbackTask;   // the replay being watched, if any
 @property(nonatomic) host::Dashboard dashboard;
 @property(nonatomic) NSWindow* window;
 @property(nonatomic) NSStackView* stack;
@@ -1298,8 +1299,53 @@ static NSButton* pairing_button(NSString* title, NSString* sym, id target, SEL a
     NSTextField* result = [NSTextField labelWithString:ns(r.result)];
     result.font = meleeFont(13); result.textColor = r.win ? kGreen() : r.loss ? kRed() : [NSColor colorWithWhite:1 alpha:0.6];
     [row addArrangedSubview:text]; [row addArrangedSubview:spacer]; [row addArrangedSubview:result];
+    if (!r.path.empty()) {
+      [row addArrangedSubview:[self replayButton:@"play.fill" label:@"Watch this game" path:ns(r.path) action:@selector(playReplay:)]];
+      [row addArrangedSubview:[self replayButton:@"folder" label:@"Show the replay file in Finder" path:ns(r.path) action:@selector(revealReplay:)]];
+    }
     [self.gamesStack addArrangedSubview:row];
   }
+}
+// The two icon buttons on a recent game: watch it, or show its .slp in Finder to share it. The file travels in the
+// button's identifier.
+- (NSButton*)replayButton:(NSString*)symbolName label:(NSString*)text path:(NSString*)path action:(SEL)action {
+  NSButton* b = [NSButton buttonWithImage:symbol(symbolName, 12, NSFontWeightSemibold) target:self action:action];
+  b.bezelStyle = NSBezelStyleRounded;
+  if (@available(macOS 26.0, *)) b.bezelStyle = NSBezelStyleGlass;
+  b.controlSize = NSControlSizeRegular; b.toolTip = text; b.identifier = path;
+  [b setAccessibilityLabel:text];
+  return b;
+}
+- (void)revealReplay:(NSButton*)sender {
+  NSURL* file = [NSURL fileURLWithPath:sender.identifier];
+  if ([NSFileManager.defaultManager fileExistsAtPath:file.path]) [NSWorkspace.sharedWorkspace activateFileViewerSelectingURLs:@[file]];
+  else host::mac_show_error("The replay is gone", std::string("There is no file at ") + file.path.UTF8String);
+}
+// Replays run in the app's second executable: the same game translated with Slippi's playback codes, which feed the
+// recorded inputs to the game. It opens in its own window and the dashboard stays where it is.
+- (void)playReplay:(NSButton*)sender {
+  NSString* replay = sender.identifier;
+  NSString* exe = nil; NSString* sys = nil;
+  if (const char* e = std::getenv("MELEE_PLAYBACK_EXE")) exe = ns(e);
+  else exe = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"Contents/MacOS/DashdancePlayback"];
+  if (const char* e = std::getenv("MELEE_PLAYBACK_SYS_DIR")) sys = ns(e);
+  else sys = [NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"slippi_sys_playback"];
+  if (![NSFileManager.defaultManager isExecutableFileAtPath:exe]) { host::mac_show_error("Replays are not part of this build", "This copy of the app was packaged without the playback executable. Build it with tools/mac/rebuild.sh."); return; }
+  if (self.settings->iso.empty()) { host::mac_show_error("Choose your disc first", "Watching a replay needs the same disc image as playing."); return; }
+  if (![NSFileManager.defaultManager fileExistsAtPath:replay]) { host::mac_show_error("The replay is gone", std::string("There is no file at ") + replay.UTF8String); return; }
+  if (self.playbackTask.running) [self.playbackTask terminate];   // one replay at a time
+  NSString* support = [ns(self.settings->replay_dir) stringByDeletingLastPathComponent];
+  NSTask* task = [[NSTask alloc] init];
+  task.executableURL = [NSURL fileURLWithPath:exe];
+  task.arguments = @[@"--iso", ns(self.settings->iso), @"--replay", replay, @"--sys-dir", sys,
+                     @"--profile-dir", [support stringByAppendingPathComponent:@"PlaybackUser"],
+                     @"--volume", [NSString stringWithFormat:@"%d", self.settings->volume],
+                     @"--scale", self.settings->scale > 0 ? [NSString stringWithFormat:@"%d", self.settings->scale] : @"auto",
+                     @"--replay-codes", [NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"playback_codes.bin"],
+                     @"--allow-interpreter"];
+  NSError* error = nil;
+  if (![task launchAndReturnError:&error]) { host::mac_show_error("The replay could not start", error.localizedDescription.UTF8String); return; }
+  self.playbackTask = task;
 }
 - (NSStackView*)controllerRow:(NSString*)iconName title:(NSString*)title subtitle:(NSString*)subtitle {
   NSStackView* row = [[NSStackView alloc] init]; row.orientation = NSUserInterfaceLayoutOrientationHorizontal; row.spacing = 10; row.alignment = NSLayoutAttributeCenterY;
@@ -1600,6 +1646,17 @@ bool launcher_run(LauncherSettings& settings, const std::string& error) {
         text_audit(launcher.window, "dashboard");
         if (NSWindow* sheet = launcher.window.attachedSheet) text_audit(sheet, "sheet");
       });
+    if (const char* row = std::getenv("MELEE_PLAY_REPLAY")) {   // test aid: press the Watch button of recent game N (0 = newest); "reveal:N" presses Show in Finder
+      const std::string r = row;
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        const bool reveal = r.rfind("reveal:", 0) == 0;
+        const NSUInteger index = (NSUInteger)std::atoi(r.c_str() + (reveal ? 7 : 0));
+        NSArray<NSView*>* rows = launcher.gamesStack.arrangedSubviews;
+        if (index >= rows.count) { host::log("launcher: MELEE_PLAY_REPLAY %s: only %lu recent games", r.c_str(), (unsigned long)rows.count); return; }
+        for (NSView* v in ((NSStackView*)rows[index]).arrangedSubviews)
+          if ([v isKindOfClass:NSButton.class] && ((NSButton*)v).action == (reveal ? @selector(revealReplay:) : @selector(playReplay:))) { [(NSButton*)v performClick:nil]; break; }
+      });
+    }
     if (std::getenv("MELEE_OPEN_PAIRING"))   // screenshot aid: the Connect a Controller sheet
       dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [launcher connectController]; });
     if (const char* which = std::getenv("MELEE_OPEN_EDITOR")) {   // screenshot aid: "keyboard", or "pad:<guid>:<name>"

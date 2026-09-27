@@ -22,6 +22,20 @@ if [[ "$APP_NAME" != "Dashdance" ]]; then
 fi
 cp "$EXE" "$APP/Contents/MacOS/Dashdance"
 cp -R "$ROOT/port/slippi_sys" "$APP/Contents/Resources/slippi_sys"
+# Replay playback: the game translated with Slippi's playback codes, a second executable the dashboard starts for
+# "Watch this game". PLAYBACK_BUILD names its build directory (default: <build-dir>-playback); without it the app
+# still works and says replays are not part of the build.
+PLAYBACK_EXE="${PLAYBACK_BUILD:-$BUILD-playback}/port/melee_port_mac"
+if [[ -x "$PLAYBACK_EXE" ]]; then
+  cp "$PLAYBACK_EXE" "$APP/Contents/MacOS/DashdancePlayback"
+  cp -R "$ROOT/port/slippi_sys_playback" "$APP/Contents/Resources/slippi_sys_playback"
+  # The replay code list the playback build was translated with (Slippi's codes, not game data): the app compares a
+  # replay's own list with it and turns resync on when they differ.
+  [[ -f "$ROOT/build/playback-codes/gecko_list.bin" ]] && cp "$ROOT/build/playback-codes/gecko_list.bin" "$APP/Contents/Resources/playback_codes.bin"
+  echo "playback: bundled $PLAYBACK_EXE"
+else
+  echo "playback: no $PLAYBACK_EXE, replays will not play in this bundle"
+fi
 cp "$ROOT/port/app/icons/AppIcon.icon/Assets/glyph.png" "$APP/Contents/Resources/AppMark.png"   # the hero mark in the dashboard
 cp -R "$ROOT/port/app/art/controller" "$APP/Contents/Resources/controller"                        # controller editor artwork
 # App icon: the Icon Composer bundle (the Dashdance mark as a glass layer over violet) compiled by

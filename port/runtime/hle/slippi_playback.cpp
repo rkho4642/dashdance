@@ -13,12 +13,15 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <unordered_map>
 
 namespace slippi::playback {
 namespace {
 std::string g_path;
+std::string g_translated_list_path;   // the code list this executable was translated with (--replay-codes)
+bool g_resync = false;                // the replay's list differs: let the playback codes follow the recorded positions
 std::unique_ptr<Slippi::SlippiGame> g_game;
 bool g_loaded_once = false, g_finished = false;
 int32_t g_current_frame = Slippi::GAME_FIRST_FRAME;
@@ -142,7 +145,38 @@ void dump_ram_if_requested(int32_t frame) {
 }
 }  // namespace
 
+// Whether two replay code lists translate to the same code. Lists recorded minutes apart differ in a few data words
+// (state a code keeps in its own data table: behind a `blrl`, or between a forward `bl` and its target; read from RAM at run time), and play back frame-exact on the same
+// translation; anything else that differs (a header, a memory write, an instruction) needs its own translation.
+// Codes are 8-byte lines: C2 address + line count, then the body; 06 address + byte count, then the bytes; other types
+// one line.
+static bool same_translation(const std::vector<uint8_t>& a, const std::vector<uint8_t>& b) {
+  if (a.size() != b.size()) return false;
+  auto be32 = [](const std::vector<uint8_t>& v, size_t i) { return (uint32_t)v[i] << 24 | (uint32_t)v[i + 1] << 16 | (uint32_t)v[i + 2] << 8 | v[i + 3]; };
+  size_t i = 0;
+  while (i + 8 <= a.size()) {
+    if (std::memcmp(&a[i], &b[i], 8) != 0) return false;               // code header (or a one-line code) differs
+    const uint8_t type = a[i] & 0xFE;
+    size_t body = type == 0xC2 ? (size_t)be32(a, i + 4) * 8 : type == 0x06 ? ((size_t)be32(a, i + 4) + 7) / 8 * 8 : 0;
+    i += 8;
+    if (body > a.size() - i) return false;
+    bool after_blrl = false;
+    size_t data_end = 0;                                               // words before this offset are data a `bl` jumps over
+    for (size_t w = i; w < i + body; w += 4) {
+      const bool equal = std::memcmp(&a[w], &b[w], 4) == 0;
+      const bool data = type == 0xC2 && (after_blrl || w < data_end);
+      if (!equal && !data) return false;                               // only a code's own data may differ
+      if (!equal || w < data_end) continue;
+      const uint32_t insn = be32(a, w);
+      if (insn == 0x4E800021) after_blrl = true;                       // blrl: the rest of the code is its data
+      else if ((insn & 0xFC000003) == 0x48000001 && !(insn & 0x02000000)) data_end = w + (insn & 0x03FFFFFC);   // forward bl over a data table (then mflr)
+    }
+    i += body;
+  }
+  return true;
+}
 void set_replay(const std::string& path) { g_path = path; }
+void set_translated_code_list(const std::string& path) { g_translated_list_path = path; }
 bool enabled() { return !g_path.empty(); }
 
 void prepare_is_file_ready(std::vector<uint8_t>& q) {
@@ -182,9 +216,22 @@ void prepare_game_info(const uint8_t*, std::vector<uint8_t>& q) {
   bool preload_ps = version[0] > 1 || (version[0] == 1 && version[1] > 2);
   q.push_back(preload_ps ? 1 : 0);
   q.push_back(settings->isFrozenPS);
-  q.push_back(0);   // shouldResync
+  const size_t resync_at = q.size();
+  q.push_back(0);   // shouldResync, decided below once the replay's code list is known
   for (int i = 0; i < 4; ++i) { auto& name = settings->players[(uint8_t)i].displayName; q.insert(q.end(), name.begin(), name.end()); }
   prepare_gecko_list();
+  // The replay's codes (UCF and friends) only run if this executable was translated with the same list. A replay from
+  // another Slippi version can carry a different one; its physics would drift, so Slippi's resync keeps the picture on
+  // the recording instead.
+  if (!g_translated_list_path.empty()) {
+    std::ifstream in(g_translated_list_path, std::ios::binary);
+    const std::vector<uint8_t> translated((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const bool same = same_translation(translated, g_gecko_list);
+    static bool reported = false;
+    if (!reported || same == g_resync) host::log("playback: the replay's code list %s the translated one%s", same ? "matches" : "differs from", same ? "" : "; resync on");
+    reported = true; g_resync = !same;
+    q[resync_at] = g_resync ? 1 : 0;
+  }
   append_u32(q, (uint32_t)g_gecko_list.size());
   g_current_frame = Slippi::GAME_FIRST_FRAME;
 }

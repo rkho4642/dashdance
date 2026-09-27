@@ -48,6 +48,7 @@ std::vector<GameRow> Dashboard::rows() const {
   std::vector<GameRow> out;
   for (const auto& g : games) {
     GameRow r;
+    r.path = g.path;
     std::string vs;
     int mine = -1;
     for (const auto& p : g.players) {

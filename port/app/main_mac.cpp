@@ -17,6 +17,7 @@
 #include "numeric.h"
 #include "slippi_net.h"
 #include "slippi_online.h"
+#include "slippi_playback.h"
 #include "window.h"
 
 #include <cstdio>
@@ -70,6 +71,8 @@ void usage() {
       "  --netplay-port N         fixed local UDP port for netplay\n"
       "  --local-peer i:port:ip:port  peer two local instances directly (testing)\n"
       "  --sys-dir DIR            Slippi Sys folder (code tables, GameFiles)\n"
+      "  --replay FILE.slp        play a recorded game back (playback build only: the app's DashdancePlayback executable)\n"
+      "  --replay-codes FILE      the code list the playback build was translated with; a replay with another list plays with resync\n"
       "  --replay-dir DIR         .slp output (default ~/Library/Application Support/Dashdance/Replays)\n"
       "  --card-dir DIR           memory card A folder of .gci files\n"
       "  --profile-dir DIR        app profile root (settings, Aurora preferences)\n"
@@ -172,7 +175,7 @@ int main(int argc, char** argv) {
   int volume = 70; bool volume_arg = false;
   uint32_t window_w = 1280, window_h = 960;
   gx::MetalOptions gfx;
-  std::string script, iso_arg, user_dir, sys_dir, replay_dir, card_dir, profile_dir, cache_dir, log_file;
+  std::string script, iso_arg, user_dir, sys_dir, replay_dir, card_dir, profile_dir, cache_dir, log_file, replay_file;
   bool offline = false, choose_disc = false, fullscreen_arg = false, delay_arg = false;
   bool hidden = false;
   bool expect_scene = false; uint16_t expected_scene = 0;
@@ -215,6 +218,8 @@ int main(int argc, char** argv) {
       lp.remote_ip = v.substr(a2 + 1, a3 - a2 - 1); lp.remote_port = (uint16_t)std::atoi(v.substr(a3 + 1).c_str()); }
     else if (a == "--sys-dir") sys_dir = next();
     else if (a == "--replay-dir") replay_dir = next();
+    else if (a == "--replay") replay_file = next();
+    else if (a == "--replay-codes") slippi::playback::set_translated_code_list(next());
     else if (a == "--card-dir") card_dir = next();
     else if (a == "--profile-dir") profile_dir = next();
     else if (a == "--cache-dir") cache_dir = next();
@@ -234,6 +239,13 @@ int main(int argc, char** argv) {
     else { usage(); return 2; }
   }
   if (iso_arg.empty()) { if (const char* env = std::getenv("MELEE_ISO")) iso_arg = env; }
+  // Replay playback: the recorded inputs drive the game, nothing goes online, and the copy the recording path writes
+  // while it plays goes to a scratch folder so it never shows up next to the player's own games.
+  if (!replay_file.empty()) {
+    offline = true;
+    if (replay_dir.empty()) replay_dir = (fs::temp_directory_path() / "dashdance-playback").string();
+    slippi::playback::set_replay(replay_file);
+  }
 
   const fs::path support = fs::path(home_dir()) / "Library/Application Support/Dashdance";
   for (const char* old_name : {"iSlippi", "Shine", "MeleeUnlocked"}) {   // carry settings, saves and replays over from earlier names
@@ -309,6 +321,8 @@ int main(int argc, char** argv) {
     if (!settings.online) offline = true;
     if (ensure_dir(support.string(), "support")) save_launcher_ini(remembered, settings);
   }
+  // A replay opens in a window next to the dashboard unless asked otherwise; Option-Return still toggles full screen.
+  const bool start_fullscreen = fullscreen_arg || (settings.fullscreen && replay_file.empty());
   // Command-line flags win over remembered launcher values.
   host::touch_set_opacity(overlay_opacity_arg >= 0.0f ? overlay_opacity_arg : settings.overlay_opacity);
   gfx.widescreen = widescreen_arg || settings.widescreen;
@@ -380,16 +394,16 @@ int main(int argc, char** argv) {
     gfx.cache_dir = cache_dir;
     backend = gx::create_metal_backend(layer, client_w, client_h, gfx);
     host::log("display: %.0f Hz refresh; the game simulates at 60 Hz and each frame is shown on the next refresh slot", host::window_refresh_rate());
-    for (const host::ReadinessItem& item : host::competitive_readiness((int)host::window_refresh_rate(), settings.fullscreen || fullscreen_arg, online.delay))
+    for (const host::ReadinessItem& item : host::competitive_readiness((int)host::window_refresh_rate(), start_fullscreen, online.delay))
       host::log("readiness: %s %s", item.ok ? "ok  " : "note", item.text.c_str());
     host::window_set_resize_callback([backend](int w, int h) { gx::metal_resize(backend, w, h); });
-    if (settings.fullscreen || fullscreen_arg) host::window_set_fullscreen(true);
+    if (start_fullscreen) host::window_set_fullscreen(true);
     gx::metal_set_overlay(backend, host::game_overlay);
     {
       host::RuntimeSettings rs;
       rs.scale = gfx.efb_scale; rs.anisotropy = gfx.anisotropy; rs.sharpness = gfx.sharpness; rs.upscaler = gfx.upscaler; rs.widescreen = gfx.widescreen; rs.vsync = gfx.vsync;
       rs.volume = std::clamp(volume, 0, 100); rs.overlay_opacity = settings.overlay_opacity; rs.overlay_scale = settings.overlay_scale;
-      rs.hud = settings.hud; rs.fullscreen = settings.fullscreen || fullscreen_arg; rs.online_delay = online.delay;
+      rs.hud = settings.hud; rs.fullscreen = start_fullscreen; rs.online_delay = online.delay;
       host::menu_init(rs, [backend, &gfx](const host::RuntimeSettings& s, host::MenuChange what) {
         switch (what) {
           case host::MenuChange::Graphics: gfx.efb_scale = s.scale; gfx.anisotropy = s.anisotropy; gfx.sharpness = s.sharpness; gfx.upscaler = s.upscaler; gfx.vsync = s.vsync; gx::metal_set_options(backend, gfx); break;
@@ -407,7 +421,7 @@ int main(int argc, char** argv) {
     audio_opened = true;
     {
       const char* override_id = std::getenv("MELEE_DISCORD_APP_ID");   // test aid: another Discord application
-      if (settings.discord_enabled || (override_id && *override_id)) {
+      if ((settings.discord_enabled && replay_file.empty()) || (override_id && *override_id)) {
         slippi::discord::start(settings.discord_show_rank, override_id ? override_id : "");
         slippi::discord::set_player(settings.account_name, settings.account_code, settings.rank, settings.rating);
       }

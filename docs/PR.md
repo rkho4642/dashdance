@@ -18,9 +18,14 @@ Details and evidence for each are in `docs/MAC_FIXES.md`.
 
 - The headless executable links again (it called Discord presence, which only the app has).
 
+- A pipeline waiting in the boot-time precompile queue is compiled at once when a draw needs it. With a cold shader cache (after every app update) characters stayed invisible for up to a minute and a half while 900 pipelines compiled one at a time.
+
 ## Features
 
 - Show live ping in the performance HUD during online matches.
+
+- Recent games: every game gets two buttons, Watch (plays the replay back in a window) and Show in Finder (selects the .slp so it can be shared). Playback is the app's second executable, `DashdancePlayback`: the game translated with Slippi's playback codes and the replay code list, bundled by `tools/package_macos_app.sh` and built by `tools/mac/rebuild.sh`. Re-recordings of four online games matched the originals on every post-frame record (up to 21,860 per game).
+- `--replay FILE.slp` and `--replay-codes FILE` on the Mac frontend; a replay whose code list needs another translation plays with Slippi's resync on and says so in the log.
 
 ## Logging
 
@@ -53,6 +58,8 @@ All in `tools/mac/`, written up for agents in the `fix-logs` skill (`desync.md`,
 - `MELEE_PHASE_SWEEP_MS`: sweeps the game/display phase to show whether latency depends on it (on an M2 Pro it does not).
 - `APP_NAME=DashDance2 tools/package_macos_app.sh` packages a side-by-side copy with its own name, bundle identifier and an orange icon.
 - docs/PERFORMANCE.md: M2 Pro in-match measurements; MetalFX at a fixed scale costs 3 ms of latency.
+
+- `MELEE_PLAY_REPLAY=<n>` / `reveal:<n>`: presses a recent game's Watch or Show in Finder button (UI test aid).
 
 ## Before opening
 

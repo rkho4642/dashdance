@@ -10,6 +10,7 @@
 
 namespace slippi::playback {
 void set_replay(const std::string& path);   // --replay <file.slp>
+void set_translated_code_list(const std::string& path);   // --replay-codes <gecko_list.bin>: the list this build was translated with
 bool enabled();
 void prepare_game_info(const uint8_t* payload, std::vector<uint8_t>& q);     // CMD_PREPARE_REPLAY
 void prepare_frame_data(const uint8_t* payload, std::vector<uint8_t>& q);    // CMD_READ_FRAME
