@@ -1,13 +1,16 @@
 #!/bin/zsh
-# Rebuild Dashdance after a source edit and install it to /Applications.
+# Rebuild Dashdance after a source edit and install it to /Applications as $APP_NAME (default DashDance2, the
+# side-by-side copy this checkout plays on; APP_NAME=Dashdance installs under the original name).
 # The port's input manifest pins every source file, so an edit needs the generate stage first.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 B="$ROOT/build/mac"
 cd "$ROOT"
+export APP_NAME="${APP_NAME:-DashDance2}"
+APP="/Applications/$APP_NAME.app"
 if [[ "${1:-}" == "--install-only" ]]; then
   pgrep -x Dashdance > /dev/null && { echo "Quit Dashdance first."; exit 1; }
-  rm -rf /Applications/Dashdance.app && ditto dist/Dashdance.app /Applications/Dashdance.app && echo "Installed /Applications/Dashdance.app"; exit 0
+  rm -rf "$APP" && ditto "dist/$APP_NAME.app" "$APP" && echo "Installed $APP"; exit 0
 fi
 python3 tools/bootstrap_port.py --decomp-root deps/melee --dol deps/disc/main.dol --build-dir "$B" \
   --gct-base 0x8065CC80 --macos-arch arm64 --stage generate > "$ROOT/regen.log" 2>&1 || { tail -20 "$ROOT/regen.log"; exit 1; }
@@ -27,8 +30,8 @@ if [[ -d "$P" && -z "${SKIP_PLAYBACK:-}" ]]; then
 fi
 tools/package_macos_app.sh "$B" dist
 if pgrep -x Dashdance > /dev/null; then
-  echo "Built dist/Dashdance.app. Dashdance is running, so /Applications was not updated; quit it and run: $0 --install-only"
+  echo "Built dist/$APP_NAME.app. Dashdance is running, so /Applications was not updated; quit it and run: $0 --install-only"
   exit 0
 fi
-rm -rf /Applications/Dashdance.app && ditto dist/Dashdance.app /Applications/Dashdance.app
-echo "Installed /Applications/Dashdance.app ($(git rev-parse --short HEAD)$(git diff --quiet || echo '+dirty'))"
+rm -rf "$APP" && ditto "dist/$APP_NAME.app" "$APP"
+echo "Installed $APP ($(git rev-parse --short HEAD)$(git diff --quiet || echo '+dirty'))"
