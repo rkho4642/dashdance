@@ -28,8 +28,15 @@ cp -R "$ROOT/port/app/art/controller" "$APP/Contents/Resources/controller"      
 # actool into Assets.car + AppIcon.icns, so macOS 26 renders it as Liquid Glass. Older toolchains fall
 # back to the flat 1024px master.
 # actool lives in Xcode, not in the Command Line Tools; point at Xcode for this one step when it is installed.
+# A side-by-side copy gets an orange icon so the two apps can be told apart in the Dock and Finder.
+ICON_SRC="$ROOT/port/app/icons/AppIcon.icon"
+if [[ "$APP_NAME" != "Dashdance" ]]; then
+  ICON_SRC="$(mktemp -d)/AppIcon.icon"
+  cp -R "$ROOT/port/app/icons/AppIcon.icon" "$ICON_SRC"
+  sed -i '' 's/"linear-gradient": \[[^]]*\]/"linear-gradient": ["srgb:1.00000,0.62000,0.10000,1.00000", "srgb:0.80000,0.27000,0.00000,1.00000"]/' "$ICON_SRC/icon.json"
+fi
 ACTOOL_DEV="${DEVELOPER_DIR:-}"; [[ -z "$ACTOOL_DEV" && -d /Applications/Xcode.app/Contents/Developer ]] && ACTOOL_DEV=/Applications/Xcode.app/Contents/Developer
-if [[ -n "$ACTOOL_DEV" ]] && DEVELOPER_DIR="$ACTOOL_DEV" xcrun --find actool >/dev/null 2>&1 && DEVELOPER_DIR="$ACTOOL_DEV" xcrun actool "$ROOT/port/app/icons/AppIcon.icon" --compile "$APP/Contents/Resources" \
+if [[ -n "$ACTOOL_DEV" ]] && DEVELOPER_DIR="$ACTOOL_DEV" xcrun --find actool >/dev/null 2>&1 && DEVELOPER_DIR="$ACTOOL_DEV" xcrun actool "$ICON_SRC" --compile "$APP/Contents/Resources" \
      --output-format human-readable-text --warnings --errors --output-partial-info-plist "$(mktemp)" --app-icon AppIcon \
      --include-all-app-icons --enable-on-demand-resources NO --development-region en --target-device mac \
      --minimum-deployment-target 26.0 --platform macosx >/dev/null 2>&1 && [[ -f "$APP/Contents/Resources/AppIcon.icns" ]]; then

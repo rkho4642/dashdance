@@ -51,7 +51,7 @@ All in `tools/mac/`, written up for agents in the `fix-logs` skill (`desync.md`,
 - Ready to compete warns when AirDrop/AirPlay (AWDL) is active on Wi-Fi, a known source of ping spikes.
 - `MELEE_FORCE_CPU=<level>` and `port/scripts/cpu_match.txt`: a scripted level 9 CPU fight for measuring frame times in a real match.
 - `MELEE_PHASE_SWEEP_MS`: sweeps the game/display phase to show whether latency depends on it (on an M2 Pro it does not).
-- `APP_NAME=DashDance2 tools/package_macos_app.sh` packages a side-by-side copy with its own name and bundle identifier.
+- `APP_NAME=DashDance2 tools/package_macos_app.sh` packages a side-by-side copy with its own name, bundle identifier and an orange icon.
 - docs/PERFORMANCE.md: M2 Pro in-match measurements; MetalFX at a fixed scale costs 3 ms of latency.
 
 ## Before opening
