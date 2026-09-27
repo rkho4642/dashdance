@@ -32,6 +32,21 @@ Games &nbsp;·&nbsp; Free &nbsp;·&nbsp; Open source &nbsp;·&nbsp; For Slippi O
 |:---:|:---:|:---:|:---:|
 | Mac · iPhone · iPad · Vision Pro | Free | 73 MB on Mac | Games |
 
+## About this fork
+
+This is [rkho4642's](https://github.com/rkho4642/dashdance) playtest fork of [TheAndersMadsen/dashdance](https://github.com/TheAndersMadsen/dashdance). Everything here is the original Dashdance plus fixes found by playing it on a Mac, kept on the `dashdance2` branch until they go upstream. What is different from the original:
+
+- **Online games no longer drop 30 seconds after connecting** when the opponent's router remaps their port. An expired connection attempt to the advertised port no longer counts the player as gone.
+- **Characters no longer stay invisible after an app update.** A draw whose shader is still waiting in the boot-time precompile queue compiles it at once instead of waiting up to a minute and a half.
+- **Recent games can be watched.** Every recent game has a Watch button, which plays the replay back in its own window, and a Show in Finder button that selects the `.slp` so it can be shared.
+- **Ready to compete warns about AirDrop and AirPlay** on Wi-Fi, a known source of ping spikes and rollbacks.
+- **M2 Pro tuning:** the simulation thread's real-time budget goes from 5 to 8 ms so it stops competing with the render and audio threads.
+- **GameCube adapter shutdown fixes:** the adapter is closed and its reader thread joined cleanly at exit.
+- **Side-by-side install:** `tools/mac/rebuild.sh` builds and installs the fork as *DashDance2* with an orange icon and its own bundle identifier, so it can live next to the original app.
+- **More netplay logging:** every ENet peer event is logged, so a dropped game can be explained from the session log.
+
+The full list, with evidence and method for each fix, is in [docs/PR.md](docs/PR.md) and [docs/MAC_FIXES.md](docs/MAC_FIXES.md). Build it the same way as the original (see [Get Dashdance](#get-dashdance)); developers rebuild with `tools/mac/rebuild.sh`.
+
 ## What's New
 
 **Version 0.1.5-beta**
