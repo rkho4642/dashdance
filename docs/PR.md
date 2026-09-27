@@ -47,6 +47,13 @@ All in `tools/mac/`, written up for agents in the `fix-logs` skill (`desync.md`,
 - `crashram.py`: shows what a crash's broken object is and what points at it.
 - `slp.py`: small replay reader the others share.
 
+- Simulation thread real-time budget raised from 5 to 8 ms (an M2 Pro needs 6 to 10 ms per online frame); `MELEE_RT_COMPUTE_MS` overrides it.
+- Ready to compete warns when AirDrop/AirPlay (AWDL) is active on Wi-Fi, a known source of ping spikes.
+- `MELEE_FORCE_CPU=<level>` and `port/scripts/cpu_match.txt`: a scripted level 9 CPU fight for measuring frame times in a real match.
+- `MELEE_PHASE_SWEEP_MS`: sweeps the game/display phase to show whether latency depends on it (on an M2 Pro it does not).
+- `APP_NAME=DashDance2 tools/package_macos_app.sh` packages a side-by-side copy with its own name and bundle identifier.
+- docs/PERFORMANCE.md: M2 Pro in-match measurements; MetalFX at a fixed scale costs 3 ms of latency.
+
 ## Before opening
 
 - Drop the "Fork workflow" section from `CLAUDE.md`, `.agents/skills/fix-logs`, `.claude/skills/fix-logs` and this file.

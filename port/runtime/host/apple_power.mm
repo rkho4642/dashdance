@@ -18,6 +18,11 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
+#if TARGET_OS_OSX
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <cstring>
+#endif
 
 #if !TARGET_OS_OSX && !TARGET_OS_VISION
 // Holds the display at its highest refresh rate while a game runs. A ProMotion iPhone or iPad otherwise lowers the panel
@@ -49,6 +54,21 @@ namespace {
 id g_activity = nil;
 std::atomic<bool> g_low_power{false}, g_bluetooth_audio{false};
 id g_power_observer = nil, g_route_observer = nil;
+// The Apple Wireless Direct Link interface (AirDrop, AirPlay, Handoff) makes the Wi-Fi radio hop channels, which shows up
+// as periodic ping spikes and extra rollbacks. It is up and running whenever one of those services is listening.
+bool awdl_active() {
+#if TARGET_OS_OSX
+  bool active = false;
+  ifaddrs* list = nullptr;
+  if (getifaddrs(&list) != 0) return false;
+  for (ifaddrs* i = list; i; i = i->ifa_next)
+    if (i->ifa_name && std::strncmp(i->ifa_name, "awdl", 4) == 0 && (i->ifa_flags & IFF_UP) && (i->ifa_flags & IFF_RUNNING)) { active = true; break; }
+  freeifaddrs(list);
+  return active;
+#else
+  return false;
+#endif
+}
 std::atomic<int> g_net_kind{-1};   // -1 not known yet, 0 offline, 1 wired, 2 Wi-Fi, 3 mobile data, 4 other (VPN and such)
 nw_path_monitor_t g_path_monitor = nil;
 void network_monitor_start() {
@@ -127,7 +147,10 @@ std::vector<ReadinessItem> competitive_readiness(int display_hz, bool fullscreen
   if (NSProcessInfo.processInfo.lowPowerModeEnabled) v.push_back({false, "Low Power Mode is on: it limits the display and slows the CPU"});
   switch (g_net_kind.load()) {
     case 1: v.push_back({true, "Wired network: the steadiest connection for online play"}); break;
-    case 2: v.push_back({false, "Wi-Fi: a wired Ethernet connection rolls back less"}); break;
+    case 2:
+      v.push_back({false, "Wi-Fi: a wired Ethernet connection rolls back less"});
+      if (awdl_active()) v.push_back({false, "AirDrop and AirPlay share the Wi-Fi radio and cause ping spikes: turn off AirDrop and AirPlay Receiver while playing"});
+      break;
     case 3: v.push_back({false, "Mobile data: expect more rollback; Wi-Fi or Ethernet is steadier"}); break;
     case 0: v.push_back({false, "No network connection: online play is unavailable"}); break;
     case 4: v.push_back({true, "Connected to the network"}); break;

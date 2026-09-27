@@ -559,7 +559,7 @@ static uint64_t g_late_frames = 0;
 uint64_t late_frame_count() { return g_late_frames; }
 double last_sim_frame_ms() { return g_last_sim_ms; }
 
-void thread_realtime(const char* name, double computation_ms) {
+void thread_realtime(const char* name, double computation_ms, double constraint_ms) {
 #if defined(__APPLE__)
   if (const char* e = std::getenv("MELEE_REALTIME")) if (*e == '0') return;
   mach_timebase_info_data_t tb; mach_timebase_info(&tb);
@@ -568,15 +568,22 @@ void thread_realtime(const char* name, double computation_ms) {
   thread_time_constraint_policy_data_t policy;
   policy.period = ticks(16.667);                          // one simulation frame
   policy.computation = ticks(computation_ms);             // typical work per frame
-  policy.constraint = ticks(12.0);                        // must be done well inside the period
+  policy.constraint = ticks(constraint_ms);               // must be done well inside the period
   policy.preemptible = TRUE;
   kern_return_t kr = thread_policy_set(pthread_mach_thread_np(pthread_self()), THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t)&policy, THREAD_TIME_CONSTRAINT_POLICY_COUNT);
-  log("%s thread: real-time scheduling %s (period 16.7 ms, computation %.0f ms, constraint 12 ms)", name, kr == KERN_SUCCESS ? "on" : "unavailable", computation_ms);
+  log("%s thread: real-time scheduling %s (period 16.7 ms, computation %.0f ms, constraint %.0f ms)", name, kr == KERN_SUCCESS ? "on" : "unavailable", computation_ms, constraint_ms);
 #else
-  (void)name; (void)computation_ms;
+  (void)name; (void)computation_ms; (void)constraint_ms;
 #endif
 }
-void simulation_thread_realtime() { thread_realtime("simulation", 5.0); }
+// The computation budget has to cover a real frame: an M2 Pro simulates an online frame in 6 to 7 ms and 8 to 10 ms when
+// it rolls back, and a thread that outruns its budget competes with the other real-time threads (render, audio) for the
+// rest of the period. MELEE_RT_COMPUTE_MS overrides it for A/B runs.
+void simulation_thread_realtime() {
+  double ms = 8.0;
+  if (const char* e = std::getenv("MELEE_RT_COMPUTE_MS")) { const double v = std::atof(e); if (v >= 1.0 && v <= 14.0) ms = v; }
+  thread_realtime("simulation", ms, 14.0);
+}
 #if !defined(__APPLE__)
 void notify_local(const std::string&, const std::string&) {}
 void power_play_begin() {}
@@ -643,6 +650,14 @@ void retrace() {
   advance_frame();
   if (!options.fast) {
     g_next_frame += std::chrono::microseconds((long long)(16667.0 / g_emulation_speed + phase_lock_shift_ms() * 1000.0));
+    // MELEE_PHASE_SWEEP_MS=<ms>: measurement aid. Every 300 frames move the frame grid that much later and log it, so a
+    // MELEE_METAL_LATENCY=1 run shows frame-to-panel latency as a function of the phase between the game and the display.
+    static const double sweep_ms = [] { const char* e = std::getenv("MELEE_PHASE_SWEEP_MS"); return e ? std::atof(e) : 0.0; }();
+    if (sweep_ms != 0.0 && g_retraces % 300 == 0) {
+      static double swept = 0; swept += sweep_ms;
+      g_next_frame += std::chrono::microseconds((long long)(sweep_ms * 1000.0));
+      log("phase sweep: frame grid moved to +%.1f ms", swept);
+    }
     auto now = std::chrono::steady_clock::now();
     if (g_next_frame > now) std::this_thread::sleep_until(g_next_frame);
     else if (now - g_next_frame > std::chrono::milliseconds(34)) g_next_frame = now;   // after a stall, resume at 60 Hz instead of sprinting to catch up (audio would crackle)

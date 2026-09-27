@@ -2,17 +2,24 @@
 # Packages the macOS build as "Dashdance.app" (ad-hoc signed). Nothing from the
 # game enters the bundle: only the executable and the vendored Slippi Sys folder.
 # Usage: tools/package_macos_app.sh <build-dir> <output-dir>
+# APP_NAME=DashDance2 packages a side-by-side copy under its own name and bundle identifier
+# (it shares Dashdance's settings, sign-in and replays in ~/Library/Application Support/Dashdance).
 set -euo pipefail
 ROOT="${0:A:h:h}"
 BUILD="${1:?build dir}"
 OUT="${2:?output dir}"
 VERSION="$(head -n1 "$ROOT/VERSION")"
-APP="$OUT/Dashdance.app"
+APP_NAME="${APP_NAME:-Dashdance}"
+APP="$OUT/$APP_NAME.app"
 EXE="$BUILD/port/melee_port_mac"
 [[ -x "$EXE" ]] || { echo "missing $EXE; build target melee_port_mac first" >&2; exit 1; }
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 sed "s/@VERSION@/$VERSION/g" "$ROOT/port/app/macos/Info.plist" > "$APP/Contents/Info.plist"
+if [[ "$APP_NAME" != "Dashdance" ]]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleName $APP_NAME" -c "Set :CFBundleDisplayName $APP_NAME" \
+    -c "Set :CFBundleIdentifier app.dashdance.macos.${APP_NAME:l}" "$APP/Contents/Info.plist"
+fi
 cp "$EXE" "$APP/Contents/MacOS/Dashdance"
 cp -R "$ROOT/port/slippi_sys" "$APP/Contents/Resources/slippi_sys"
 cp "$ROOT/port/app/icons/AppIcon.icon/Assets/glyph.png" "$APP/Contents/Resources/AppMark.png"   # the hero mark in the dashboard

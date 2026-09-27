@@ -117,7 +117,7 @@ double phase_lock_total_ms();
 // frame past its deadline. Apple platforms only; a no-op elsewhere.
 void simulation_thread_realtime();
 // The same policy for any 60 Hz thread (the renderer): `computation_ms` is its typical work per frame.
-void thread_realtime(const char* name, double computation_ms);
+void thread_realtime(const char* name, double computation_ms, double constraint_ms = 12.0);
 // Power and thermal state (Apple platforms; no-ops elsewhere): keeps the machine from throttling
 // timers or sleeping the display while a game runs, and logs thermal-state changes.
 void power_play_begin();

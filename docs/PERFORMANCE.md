@@ -77,3 +77,27 @@ Negative result: `-mcpu=apple-m1` plus ThinLTO for the whole binary produced no 
 noise on a 4000-frame unpaced boot or a 60 s match, and a 27% larger executable. The build stays
 plain `-O3`. The translated game is dominated by loads and stores through the guest-memory helpers,
 which are already inlined; there is no cross-module inlining left for LTO to find.
+
+## Apple M2 Pro (16 GB, built-in 120 Hz display), September 2026
+
+Measured in a real fight, not on a menu: `port/scripts/cpu_match.txt` with `MELEE_FORCE_CPU=9` plays Fox against
+Pikachu as level 9 CPUs on Final Destination, full screen, 2x internal resolution, two minutes of play per run.
+
+| Setting | Sim per frame (worst) | GPU per frame | XFB-to-panel | Late frames |
+|---|---|---|---|---|
+| 2x, MetalFX quality | 6.2 ms (8.8) | 4.3 ms | 12.6 ms | 0 |
+| 2x, MetalFX off | 6.3 ms (9.4) | 2.2 ms | 9.4 ms | 0 |
+
+- The game holds 60 frames per second with more than half of every frame to spare. Online play measured the same
+  (6 to 7 ms, worst 8 to 10 ms with rollbacks).
+- With a fixed internal resolution MetalFX does not lower the render size (only `scale=auto` halves it), so it is an extra
+  pass: 2 ms of GPU time and 3 ms of latency. Competitive players on a fixed scale should leave it off.
+- Frame-to-panel latency does not depend on the phase between the game and the display here: `MELEE_PHASE_SWEEP_MS=1`
+  moved the frame grid 1 ms every 5 s through more than a full period and commit-to-panel stayed at 9 to 10 ms. The
+  panel follows the frame (adaptive sync) and adds a fixed scan-out delay, so GPU time is the only part a setting can
+  shorten, and the phase lock cannot help.
+- The simulation thread's real-time computation budget is 8 ms (was 5 ms, below what this chip needs for a frame);
+  `MELEE_RT_COMPUTE_MS` overrides it for A/B runs. Its effect on the rare late frame online has not been measured yet.
+- Audio underruns appear only while booting and at exit, never in play.
+- Menus are not a benchmark: the character select costs 3.5 ms of simulation, a fight costs twice that. A run that logs
+  `0 replays written` never left the menus.

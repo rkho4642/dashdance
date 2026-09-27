@@ -30,6 +30,19 @@ HLE(PADSetSamplingRate) {}
 // u32 PADRead(PADStatus* status[4]) -> bitmask of channels with fresh data
 HLE(PADRead) {
   host::pump_completions();
+  // MELEE_FORCE_CPU=1..9: measurement aid. On the VS stage select (mode 0x02, state 0x01) turn the first two players
+  // into CPUs of that level, so a scripted run plays a real fight without anyone at the controls. The stage select
+  // works on its own copy of the match setup and copies it back when it exits (gmVsMelee_ExitSss: *vs = sss->vs), so
+  // the copy is what gets patched: gmVsMelee_SssData at 0x80480668, VsModeData at +8, players at +0x68 of that,
+  // 0x24 each, slot_type at +1 (Gm_PKind: 1 = CPU), cpu_level at +0xF (mn/types.h).
+  static const uint8_t force_cpu = [] { const char* v = std::getenv("MELEE_FORCE_CPU"); const int n = v ? std::atoi(v) : 0; return (uint8_t)(n >= 1 && n <= 9 ? n : 0); }();
+  if (force_cpu && host::rd8(0x80479D30) == 0x02 && host::rd8(0x80479D33) == 0x01) {
+    for (uint32_t i = 0; i < 2; ++i) {
+      const uint32_t player = 0x80480668 + 0x8 + 0x68 + i * 0x24;
+      host::wr8(player + 0x1, 1);
+      host::wr8(player + 0xF, force_cpu);
+    }
+  }
 #if defined(MELEE_PORT_OFFLINE)
   // MELEE_FORCE_SCENE=0xMMSS: automation hook. When the guest reaches the
   // main-menu scene (0x01), rewrite the state-machine bytes to jump straight
